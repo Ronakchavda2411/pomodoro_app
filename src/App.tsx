@@ -11,6 +11,7 @@ function App() {
   const [showMenu, setShowMenu] = useState(false);
 
   useEffect(() => {
+    // @ts-ignore
     let timer: NodeJS.Timeout;
     if (isRunning && time > 0) {
       timer = setInterval(() => setTime((prev) => prev - 1), 1000);
