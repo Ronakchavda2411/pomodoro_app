@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import "./App.css";
-import beepSound from "./assets/beep.mp3"; // Add beep sound file in assets folder
+import beepSound from "./assets/beep.mp3";
 
 function App() {
   const [focusTime, setFocusTime] = useState(25);
@@ -9,24 +9,46 @@ function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [isBreak, setIsBreak] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [startTime, setStartTime] = useState(0);
+  const [pausedTimeRemaining, setPausedTimeRemaining] = useState(null);
 
   useEffect(() => {
-    // @ts-ignore
-    let timer: NodeJS.Timeout;
-    if (isRunning && time > 0) {
-      timer = setInterval(() => setTime((prev) => prev - 1), 1000);
-    } else if (isRunning && time === 0) {
-      playBeep();
-      if (isBreak) {
-        resetTimer(); // Reset to focus time
-      } else {
-        startBreak(); // Start break when focus ends
-      }
+    let timerID;
+    
+    if (isRunning) {
+      // Record the current timestamp when starting
+      const now = Date.now();
+      setStartTime(now);
+      
+      timerID = setInterval(() => {
+        const currentTime = Date.now();
+        const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
+        const newTimeRemaining = pausedTimeRemaining !== null 
+          ? pausedTimeRemaining - elapsedSeconds 
+          : time - elapsedSeconds;
+        
+        if (newTimeRemaining <= 0) {
+          clearInterval(timerID);
+          setTime(0);
+          playBeep();
+          
+          if (isBreak) {
+            resetTimer();
+          } else {
+            startBreak();
+          }
+        } else {
+          setTime(newTimeRemaining);
+        }
+      }, 100); // Update more frequently for better accuracy
     }
-    return () => clearInterval(timer);
-  }, [isRunning, time]);
+    
+    return () => {
+      if (timerID) clearInterval(timerID);
+    };
+  }, [isRunning, startTime, pausedTimeRemaining]);
 
-  const formatTime = (seconds: number) => {
+  const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${minutes.toString().padStart(2, "0")}:${secs
@@ -34,19 +56,28 @@ function App() {
       .padStart(2, "0")}`;
   };
 
-  const startTimer = () => setIsRunning(true);
-  const pauseTimer = () => setIsRunning(false);
+  const startTimer = () => {
+    setPausedTimeRemaining(time);
+    setIsRunning(true);
+  };
+  
+  const pauseTimer = () => {
+    setPausedTimeRemaining(time);
+    setIsRunning(false);
+  };
   
   const resetTimer = () => {
     setIsRunning(false);
     setIsBreak(false);
+    setPausedTimeRemaining(null);
     setTime(focusTime * 60);
   };
 
   const startBreak = () => {
-    setIsRunning(true);
     setIsBreak(true);
+    setPausedTimeRemaining(breakTime * 60);
     setTime(breakTime * 60);
+    setIsRunning(true);
   };
 
   const playBeep = () => {
@@ -54,13 +85,16 @@ function App() {
     audio.play();
   };
 
-  const updateFocusTime = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const updateFocusTime = (e) => {
     const value = Math.max(1, Number(e.target.value));
     setFocusTime(value);
-    setTime(value * 60);
+    if (!isRunning && !isBreak) {
+      setTime(value * 60);
+      setPausedTimeRemaining(null);
+    }
   };
 
-  const updateBreakTime = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const updateBreakTime = (e) => {
     setBreakTime(Math.max(1, Number(e.target.value)));
   };
 
@@ -82,9 +116,9 @@ function App() {
 
       <div className="card">
         <h1>Pomodoro Timer</h1>
-        {/* <h2 className={isBreak ? "break-text" : "work-text"}>
+        <h2 className={isBreak ? "break-text" : "work-text"}>
           {isBreak ? "Break Time" : "Work Time"}
-        </h2> */}
+        </h2>
         <h1 className="timer">{formatTime(time)}</h1>
         
         <div className="buttons">
